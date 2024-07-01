@@ -163,41 +163,19 @@ class CurrentWindows(DataModel):
         """
         根据查询条件获取模型表中的一行或多行数据。
         优先以hwnd查询，如果查询参数有hwnd并且有匹配的项，则仅返回该行。
-        否则，返回只要该行中有一个参数的值匹配查询条件中的任意一个同名属性的值的所有行。
+        否则，调用父类的方法返回匹配项。
 
         :param query_dict: 包含查询条件的字典，键为列名，值为查询值
         :return: 包含查询结果的字典或字典列表
         """
-        database = Database("db.sqlite3")
-        table_data = database.get_table(self.model_name)
-        table_columns = database.get_columns(self.model_name)
-
-        if not table_data or not table_columns:
-            print(f"No valid data or columns for table '{self.model_name}'")
-            return None
-
-        def row_matches_query(row, query):
-            for col, val in query.items():
-                if col in table_columns and str(row[table_columns.index(col)]) == str(val):
-                    return True
-            return False
-
-        result = []
-
         if "hwnd" in query_dict:
-            # 优先以hwnd查询
-            for row in table_data:
-                if str(row[table_columns.index("hwnd")]) == str(query_dict["hwnd"]):
-                    result.append({table_columns[i]: row[i] for i in range(len(table_columns))})
+            hwnd_value = query_dict["hwnd"]
+            database = Database("db.sqlite3")
+            result = database.get_row_by_column_value(self.model_name, "hwnd", hwnd_value)
             if result:
-                return result[0] if len(result) == 1 else result
-
-        # 按其他条件查询
-        for row in table_data:
-            if row_matches_query(row, query_dict):
-                result.append({table_columns[i]: row[i] for i in range(len(table_columns))})
-
-        return result[0] if len(result) == 1 else result if result else None
+                table_columns = database.get_columns(self.model_name)
+                return {table_columns[i]: result[i] for i in range(len(table_columns))}
+        return super().get_model(query_dict)
 
 
 class AllWindows(DataModel):
