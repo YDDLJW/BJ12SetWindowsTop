@@ -3,13 +3,15 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Ignore virtual database
+db.sqlite3
+
 # Ignore virtual environment directory
 .venv/
 
 # Ignore environment variables files
 .env
 .venv
-.venv/
 .env.*
 venv/
 # If you are using Jupyter Notebooks
