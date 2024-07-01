@@ -1,0 +1,54 @@
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore virtual environment directory
+.venv/
+
+# Ignore environment variables files
+.env
+.venv
+.venv/
+.env.*
+venv/
+# If you are using Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Ignore distribution/build files
+build/
+dist/
+*.egg-info/
+
+# Ignore IDE/editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Ignore coverage reports
+htmlcov/
+.coverage
+.tox/
+nosetests.xml
+coverage.xml
+
+# Ignore other common files
+*.log
+*.pot
+*.mo
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ignore mypy type checking results
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ignore pytest cache
+.pytest_cache/
+
+# Ignore pylance
+.pylance/
