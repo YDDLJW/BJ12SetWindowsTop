@@ -216,12 +216,12 @@ if __name__ == '__main__':
     windows.add_model_row(row_data)
     print(windows.get_model_list())
 
-    windows.update_model_row("notes", "this is window 1", "name", "window1")
+    windows.update_model_row("notes", "", "name", "window1")
     print(windows.get_model_list())
 
     print(windows.get_model(search_data))
 
-    windows.delete_model_row("notes", "this is window 1")
+    windows.delete_model_row("name", "window1")
     print(windows.get_model_list())
 
     windows.delete_all_rows()
