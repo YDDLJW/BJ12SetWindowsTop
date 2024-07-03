@@ -39,6 +39,7 @@ class ServerControl:
         handlers_dict = {f"/SetWindowsTopAPI{handler.url}": handler for handler in self.handlers}
 
         class CustomHandler(BaseHTTPRequestHandler):
+            # 处理GET请求
             def do_GET(self):
                 parsed_path = urlparse(self.path)
                 if parsed_path.path == "/SetWindowsTopAPI":
@@ -60,6 +61,7 @@ class ServerControl:
                     self.end_headers()
                     self.wfile.write(json.dumps({"error": "Not found"}).encode())
 
+            # 处理POST请求
             def do_POST(self):
                 parsed_path = urlparse(self.path)
                 if any(parsed_path.path.startswith(f"{key}/detail") for key in handlers_dict.keys()):
