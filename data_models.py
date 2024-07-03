@@ -1,4 +1,5 @@
 from database import Database
+from datetime import datetime
 
 
 class DataModel:
@@ -38,25 +39,18 @@ class DataModel:
         :return: 包含表中所有行的字典列表或单个字典
         """
         database = Database("db.sqlite3")
-        cur = database.conn.cursor()
-        cur.execute(f"PRAGMA table_info({self.model_name})")
-        table_columns = [col[1] for col in cur.fetchall()]
+        table_columns = database.get_columns(self.model_name)
+        table_data = database.get_table(self.model_name)
 
-        cur.execute(f"SELECT * FROM {self.model_name}")
-        rows = cur.fetchall()
+        if not table_data or not table_columns:
+            print(f"No valid data or columns for table '{self.model_name}'")
+            return None
 
-        result = []
-        for row in rows:
-            row_dict = {table_columns[i]: row[i] for i in range(len(table_columns))}
-            result.append(row_dict)
+        result = [{table_columns[i]: row[i] for i in range(len(table_columns))} for row in table_data]
 
-        cur.close()
         database.close_connection()
 
-        if len(result) == 1:
-            return result[0]
-        else:
-            return result
+        return result[0] if len(result) == 1 else result
 
     def get_model(self, query_dict):
         """
@@ -177,21 +171,97 @@ class CurrentWindows(DataModel):
                 return {table_columns[i]: result[i] for i in range(len(table_columns))}
         return super().get_model(query_dict)
 
+    def add_model_row(self, *model_row_data_list):
+        """
+        添加多行数据到模型表中。
+        如果输入的字典中有与现有模型中的 hwnd 值相同的模型，则不添加该模型。
+        如果输入的字典列表中有多个字典拥有相同的 hwnd 值，则只保留第一个。
+
+        :param model_row_data_list: 包含列名和对应值的字典，可以是多个字典或一个字典的列表
+        """
+        existing_rows = self.get_model_list()
+        if existing_rows is None:
+            existing_rows = []
+
+        existing_hwnd_set = {row["hwnd"] for row in existing_rows if "hwnd" in row}
+        seen_hwnd_set = set()
+
+        def process_row(row):
+            if "hwnd" in row:
+                if row["hwnd"] in existing_hwnd_set:
+                    print(f"Model with hwnd {row['hwnd']} already exists, skipping.")
+                    return None
+                if row["hwnd"] in seen_hwnd_set:
+                    print(
+                        f"Model with hwnd {row['hwnd']} found in input list multiple times, keeping first occurrence.")
+                    return None
+                seen_hwnd_set.add(row["hwnd"])
+            return row
+
+        filtered_rows = []
+
+        for model_row_data in model_row_data_list:
+            if isinstance(model_row_data, list):
+                for row in model_row_data:
+                    processed_row = process_row(row)
+                    if processed_row:
+                        filtered_rows.append(processed_row)
+            elif isinstance(model_row_data, dict):
+                processed_row = process_row(model_row_data)
+                if processed_row:
+                    filtered_rows.append(processed_row)
+
+        if filtered_rows:
+            super().add_model_row(filtered_rows)
+
 
 class AllWindows(DataModel):
     def __init__(self):
         super().__init__(
             "all_windows",
             name="TEXT",
+            date="DATETIME",
             notes="TEXT"
         )
+
+    def add_model_row(self, *model_row_data_list):
+        """
+        添加多行数据到模型表中。
+        在此基础上，将模型中的‘date’字段（上次更新时间）更新成当前时间
+
+        :param model_row_data_list: 包含列名和对应值的字典，可以是多个字典或一个字典的列表
+        """
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+        for model_row_data in model_row_data_list:
+            # 检查并更新 "date" 字段
+            if isinstance(model_row_data, dict):
+                model_row_data["date"] = current_time
+            elif isinstance(model_row_data, list):
+                for row in model_row_data:
+                    row["date"] = current_time
+        super().add_model_row(*model_row_data_list)
+
+    def update_model_row(self, set_column, set_value, condition_column, condition_value):
+        """
+        更新模型表中符合条件的行。
+        在此基础上，将模型中的‘date’字段（上次更新时间）更新成当前时间
+
+        :param set_column: 需要更新的列名
+        :param set_value: 更新后的值
+        :param condition_column: 条件列名
+        :param condition_value: 条件值
+        """
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+        super().update_model_row('date', current_time, condition_column, condition_value)
+        super().update_model_row(set_column, set_value, condition_column, condition_value)
 
 
 if __name__ == '__main__':
     db = Database("db.sqlite3")
 
-    windows = AllWindows()
+    windows = CurrentWindows()
     windows.create_model_table()
+    windows.delete_all_rows()
 
     row_data = [
         {
@@ -205,6 +275,12 @@ if __name__ == '__main__':
             "hwnd": "1234",
             "is_set_top": False,
             "notes": "this is window 2"
+        },
+        {
+            "name": "repeated window2",
+            "hwnd": "1234",
+            "is_set_top": False,
+            "notes": "this is window 2 again! this should not print out in current windows list"
         }
     ]
 
@@ -222,7 +298,4 @@ if __name__ == '__main__':
     print(windows.get_model(search_data))
 
     windows.delete_model_row("name", "window1")
-    print(windows.get_model_list())
-
-    windows.delete_all_rows()
     print(windows.get_model_list())

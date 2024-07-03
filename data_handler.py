@@ -58,6 +58,26 @@ class DataHandler:
             if column != condition:
                 self.model.update_model_row(column, value, condition, condition_value)
 
+    def toggle_is_set_top(self, condition: str, condition_value: str):
+        """
+        根据条件切换 is_set_top 字段的值。
+
+        :param condition: 条件列名
+        :param condition_value: 条件值
+        """
+        data = self.model.get_model({condition: condition_value})
+        if not data:
+            return {"error": "No matching records found"}
+
+        if isinstance(data, list):
+            data = data[0]
+
+        current_value = data.get("is_set_top")
+        new_value = 0 if current_value else 1
+
+        self.model.update_model_row("is_set_top", new_value, condition, condition_value)
+        return self.model.get_model({condition: condition_value})
+
 
 # 测试
 if __name__ == '__main__':

@@ -1,10 +1,13 @@
 import json
+import threading
+import time
 from urllib.parse import parse_qs, urlparse
 from typing import List
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from data_handler import DataHandler
 from data_models import CurrentWindows, AllWindows
 from database import Database
+from model_control import ModelControl
 
 
 class ServerControl:
@@ -64,6 +67,10 @@ class ServerControl:
                     handler = handlers_dict.get(base_path)
                     if handler:
                         self.handle_post_request(handler)
+                elif parsed_path.path == "/SetWindowsTopAPI/current_windows/toggle_set_top":
+                    handler = handlers_dict.get("/SetWindowsTopAPI/current_windows")
+                    if handler:
+                        self.handle_toggle_set_top_request(handler, parsed_path.query)
                 else:
                     self.send_response(404)
                     self.send_header("Content-type", "application/json")
@@ -157,7 +164,94 @@ class ServerControl:
                     self.end_headers()
                     self.wfile.write(json.dumps({"error": "No valid condition provided"}).encode())
 
+            def handle_toggle_set_top_request(self, handler, query):
+                """
+                处理 POST 请求，根据传入的 JSON 数据切换 is_set_top 字段的值。
+
+                :param handler: DataHandler 实例
+                :param query: URL 参数字典
+                """
+                query_dict = parse_qs(query)
+                data_dict = {k: v[0] for k, v in query_dict.items()}
+
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    post_data = self.rfile.read(content_length).decode('utf-8')
+                    try:
+                        post_data_dict = json.loads(post_data)
+                        data_dict.update(post_data_dict)
+                    except json.JSONDecodeError:
+                        self.send_response(400)
+                        self.send_header("Content-type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
+                        return
+
+                if not data_dict:
+                    self.send_response(400)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "No data provided"}).encode())
+                    return
+
+                # 更新模型数据
+                json_data = json.dumps(data_dict)
+                condition = 'hwnd' if 'hwnd' in data_dict else 'name' if 'name' in data_dict else None
+                if condition:
+                    handler.update_model_from_json(json_data, condition)
+                    # 获取并返回更新后的模型数据
+                    result_json = handler.toggle_is_set_top(condition, data_dict[condition])
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps(result_json, ensure_ascii=False, indent=4).encode())
+                else:
+                    self.send_response(400)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "No valid condition provided"}).encode())
+
         return CustomHandler
+
+
+def backend_self_control(current_windows: CurrentWindows, all_windows: AllWindows):
+    """
+    后端自动控制程序，在后端进行操作的程序都应该在这里执行。
+
+    :param current_windows: 当前窗口模型数据库表格
+    :param all_windows:  所有窗口模型数据库表格
+    """
+
+    # 需要循环执行的程序都应该在这里执行
+    while True:
+        # 该方法内的程序每2s执行一次
+        time.sleep(2)
+
+        # 实例化模型控制器
+        model_control = ModelControl(current_windows, all_windows)
+
+        # 获取 current_windows 和 all_windows 表中的所有模型（行）
+        current_windows_rows = current_windows.get_model_list()
+        all_windows_rows = all_windows.get_model_list()
+
+        # 将结果统一为列表形式，以便处理
+        if isinstance(current_windows_rows, dict):
+            current_windows_rows = [current_windows_rows]
+        if isinstance(all_windows_rows, dict):
+            all_windows_rows = [all_windows_rows]
+
+        # 构建一个 all_windows 表的字典，便于快速查找
+        all_windows_dict = {(row['id'], row['name']): row for row in all_windows_rows if 'id' in row and 'name' in row}
+
+        # 当检测到current_windows和all_windows中id和name参数值相同的模型中的notes变化时，统一两者的notes参数的值
+        for current_row in current_windows_rows:
+            if 'id' in current_row and 'name' in current_row:
+                key = (current_row['id'], current_row['name'])
+                if key in all_windows_dict:
+                    all_row = all_windows_dict[key]
+                    if current_row['notes'] != all_row['notes']:
+                        # 以all_windows的值为标准，统一current_windows和all_windows中id和name参数的值相同的模型中的notes参数的值
+                        model_control.unified_key('notes', 'id', 'name')
 
 
 if __name__ == '__main__':
@@ -200,4 +294,12 @@ if __name__ == '__main__':
     server = ServerControl([current_windows_handler, all_windows_handler])
 
     # 启动服务器
-    server.start_server()
+    thread_server = threading.Thread(target=server.start_server)
+    thread_server.start()
+
+    # 启动后端自动控制
+    thread_control = threading.Thread(target=backend_self_control, args=(current_windows, all_windows))
+    thread_control.start()
+
+    thread_server.join()
+    thread_control.join()
