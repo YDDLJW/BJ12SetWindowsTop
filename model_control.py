@@ -32,10 +32,13 @@ class ModelControl:
             all_windows_rows = [all_windows_rows]
 
         # 构建一个 all_windows 表的字典，便于快速查找
-        all_windows_dict = {tuple(row[key] for key in condition_keys if key in row): row for row in all_windows_rows}
+        def get_key_tuple(row, keys):
+            return tuple(row.get(key) for key in keys if key in row)
+
+        all_windows_dict = {get_key_tuple(row, condition_keys): row for row in all_windows_rows}
 
         for current_row in current_windows_rows:
-            current_key_tuple = tuple(current_row.get(key) for key in condition_keys if key in current_row)
+            current_key_tuple = get_key_tuple(current_row, condition_keys)
             if current_key_tuple in all_windows_dict:
                 all_row = all_windows_dict[current_key_tuple]
                 if current_row[updated_key] != all_row[updated_key]:

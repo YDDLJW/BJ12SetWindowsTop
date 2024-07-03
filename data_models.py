@@ -3,6 +3,7 @@ from datetime import datetime
 
 
 class DataModel:
+    # 默认模型名称
     model_name = "DataModel"
 
     def __init__(self, model_table_name, **columns):
@@ -259,7 +260,7 @@ class AllWindows(DataModel):
 if __name__ == '__main__':
     db = Database("db.sqlite3")
 
-    windows = CurrentWindows()
+    windows = AllWindows()
     windows.create_model_table()
     windows.delete_all_rows()
 
@@ -280,7 +281,8 @@ if __name__ == '__main__':
             "name": "repeated window2",
             "hwnd": "1234",
             "is_set_top": False,
-            "notes": "this is window 2 again! this should not print out in current windows list"
+            "notes": "this is window 2 again! this should not be printed out in current windows list but all windows "
+                     "list"
         }
     ]
 
