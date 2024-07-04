@@ -46,6 +46,29 @@ class ModelControl:
                     condition_dict = {key: current_row[key] for key in condition_keys if key in current_row}
                     self.current_windows.update_model_row(set_dict, condition_dict)
 
+    def update_current_with_all(self, name: str):
+        """
+        根据输入的 name 和 id 字段进行查询，并用 all_windows 表的 id 和 notes 字段覆盖 current_windows 表中的相应字段。
+
+        :param name: 查询的 name 字段
+        """
+        query_dict = {"name": name}
+
+        current_row = self.current_windows.get_model(query_dict)
+        if not current_row:
+            print("No matching record found in current_windows")
+            return
+
+        all_row = self.all_windows.get_model(query_dict)
+        if not all_row:
+            print("No matching record found in all_windows")
+            return
+
+        set_dict = {"id": all_row["id"], "notes": all_row["notes"]}
+        condition_dict = {"name": name}
+
+        self.current_windows.update_model_row(set_dict, condition_dict)
+
 
 # 初始化数据库并创建表
 def initialize_database():

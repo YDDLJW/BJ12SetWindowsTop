@@ -46,7 +46,20 @@ class ServerControl:
                     self.send_response(200)
                     self.send_header("Content-type", "application/json")
                     self.end_headers()
-                    self.wfile.write(json.dumps({"message": "Welcome to WindowsSetTopAPI"}).encode())
+                    welcome_info = {
+                        "message": "Welcome to WindowsSetTopAPI",
+                        "API instructions url": "https://github.com/YDDLJW/BJ12SetWindowsTop/blob/main/API%E4%BD%BF"
+                                                "%E7%94"
+                                                "%A8%26%E5%BC%80%E5%8F%91%E6%8C%87%E5%8D%97.md#%E8%8E%B7%E5%8F%96%E7%89"
+                                                "%B9%E5%AE%9A%E5%BD%93%E5%89%8D%E7%AA%97%E5%8F%A3%E4%BF%A1%E6%81%AF",
+                        "GET all current windows list": "/SetWindowsTopAPI/current_windows",
+                        "GET all past windows list": "/SetWindowsTopAPI/all_windows",
+                        "GET or POST(update) certain current windows": "/SetWindowsTopAPI/current_windows/detail",
+                        "GET or POST(update) certain past windows": "/SetWindowsTopAPI/all_windows/detail",
+                        "POST(toggle) a current window's status of is_set_top": "/SetWindowsTopAPI/current_windows"
+                                                                                "/toggle_set_top",
+                    }
+                    self.wfile.write(json.dumps(welcome_info).encode())
                 elif parsed_path.path.endswith("/detail") and parsed_path.path.rstrip("/detail") in handlers_dict:
                     base_path = parsed_path.path.rstrip("/detail")
                     handler = handlers_dict[base_path]
@@ -97,17 +110,29 @@ class ServerControl:
                 :param handler: DataHandler 实例
                 :param query: URL 参数字典
                 """
+                query_dict = {}
+
                 if query:
-                    query_dict = {k: v[0].strip('"') for k, v in query.items()}  # 移除多余的引号
+                    query_dict.update({k: v[0].strip('"') for k, v in query.items()})  # 移除多余的引号
+
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    post_data = self.rfile.read(content_length).decode('utf-8')
+                    try:
+                        post_data_dict = json.loads(post_data)
+                        query_dict.update(post_data_dict)
+                    except json.JSONDecodeError:
+                        self.send_response(400)
+                        self.send_header("Content-type", "application/json")
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"error": "Invalid JSON"}).encode())
+                        return
+
+                if query_dict:
                     query_json = json.dumps(query_dict)
                     result_json = handler.get_model_from_json(query_json)
                 else:
-                    content_length = int(self.headers.get('Content-Length', 0))
-                    if content_length > 0:
-                        post_data = self.rfile.read(content_length).decode('utf-8')
-                        result_json = handler.get_model_from_json(post_data)
-                    else:
-                        result_json = json.dumps({"error": "No data provided"})
+                    result_json = json.dumps({"error": "No data provided"})
 
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")

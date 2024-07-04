@@ -165,8 +165,8 @@ class Database:
         """
         删除指定表中列值包含特定子字符串的行。
         :param table_name: 表名
-        :param column_name: 列名
-        :param column_value_contained: 列值包含的子字符串
+        :param column_name: 条件列名
+        :param column_value_contained: 条件列的值所包含的子字符串
         """
         cur = self.conn.cursor()
         if table_name not in self.table_names:
@@ -180,14 +180,11 @@ class Database:
         cur.close()
         return
 
-    def delete_row_by_two_conditions(self, table_name, column1, value1, column2, value2):
+    def delete_row_by_conditions(self, table_name: str, conditions: dict):
         """
-        删除指定表中同时满足两个条件的行。
+        删除指定表中符合所有条件的行。
         :param table_name: 表名
-        :param column1: 第一个条件的列名
-        :param value1: 第一个条件的列值
-        :param column2: 第二个条件的列名
-        :param value2: 第二个条件的列值
+        :param conditions: 包含作为查询条件的字段及其对应值的字典
         """
         cur = self.conn.cursor()
         if table_name not in self.table_names:
@@ -195,11 +192,24 @@ class Database:
             cur.close()
             return
 
-        query = f"DELETE FROM {table_name} WHERE {column1} = ? AND {column2} = ?"
-        cur.execute(query, (value1, value2))
+        # 获取表中的列信息
+        cur.execute(f"PRAGMA table_info({table_name})")
+        columns_info = [col[1] for col in cur.fetchall()]
+
+        # 检查条件字典中的列是否存在于表中
+        valid_conditions = {col: val for col, val in conditions.items() if col in columns_info}
+        if not valid_conditions:
+            print(f"Database.delete_row_by_conditions: No valid condition columns exist in table '{table_name}'")
+            cur.close()
+            return
+
+        condition_clause = ' AND '.join([f"{col} = ?" for col in valid_conditions.keys()])
+
+        query = f"DELETE FROM {table_name} WHERE {condition_clause}"
+        values = list(valid_conditions.values())
+        cur.execute(query, values)
         self.conn.commit()
         cur.close()
-        return
 
     def delete_all_rows(self, table_name):
         """

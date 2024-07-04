@@ -139,22 +139,20 @@ class CurrentWindows(DataModel):
     def get_model(self, query_dict):
         """
         根据查询条件获取模型表中的一行或多行数据。
-        默认hwnd唯一，优先以hwnd查询，如果查询参数有hwnd并且有匹配的项，则仅返回该行。
+        优先以 hwnd 查询，如果查询参数有 hwnd 并且有匹配的项，则仅返回该行。
         否则，调用父类的方法返回匹配项。
 
         :param query_dict: 包含查询条件的字典，键为列名，值为查询值
         :return: 包含查询结果的字典或字典列表
         """
-        if "hwnd" not in query_dict:
-            return {"error": "The 'hwnd' field is required."}
-
-        hwnd_value = query_dict["hwnd"]
-        database = Database("db.sqlite3")
-        result = database.get_row_by_column_value(self.model_name, "hwnd", hwnd_value)
-        if result:
-            table_columns = database.get_columns(self.model_name)
-            return {table_columns[i]: result[i] for i in range(len(table_columns))}
-        return {"error": "No matching records found with the specified 'hwnd'."}
+        if "hwnd" in query_dict:
+            hwnd_value = query_dict["hwnd"]
+            database = Database("db.sqlite3")
+            result = database.get_row_by_column_value(self.model_name, "hwnd", hwnd_value)
+            if result:
+                table_columns = database.get_columns(self.model_name)
+                return {table_columns[i]: result[i] for i in range(len(table_columns))}
+        return super().get_model(query_dict)
 
     def add_model_row(self, *model_row_data_list):
         """
@@ -212,19 +210,29 @@ class AllWindows(DataModel):
     def add_model_row(self, *model_row_data_list):
         """
         添加多行数据到模型表中。
-        在此基础上，将模型中的‘date’字段（上次更新时间）更新成当前时间
+        在此基础上，将模型中的‘date’字段（上次更新时间）更新成当前时间。
+        如果输入的字典中包含 name 且 name 中包含 ' - '，则将 name 修改成原字符串中 ' - ' 之后的内容。
 
         :param model_row_data_list: 包含列名和对应值的字典，可以是多个字典或一个字典的列表
         """
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+        def process_row(row):
+            if 'name' in row and ' - ' in row['name']:
+                row['name'] = row['name'].split(' - ', 1)[1]
+            row['date'] = current_time
+            return row
+
+        processed_rows = []
+
         for model_row_data in model_row_data_list:
-            # 检查并更新 "date" 字段
-            if isinstance(model_row_data, dict):
-                model_row_data["date"] = current_time
-            elif isinstance(model_row_data, list):
+            if isinstance(model_row_data, list):
                 for row in model_row_data:
-                    row["date"] = current_time
-        super().add_model_row(*model_row_data_list)
+                    processed_rows.append(process_row(row))
+            elif isinstance(model_row_data, dict):
+                processed_rows.append(process_row(model_row_data))
+
+        super().add_model_row(*processed_rows)
 
     def update_model_row(self, set_dict, condition_dict):
         """
@@ -248,7 +256,7 @@ if __name__ == '__main__':
 
     row_data = [
         {
-            "name": "window1",
+            "name": "test - window1",
             "hwnd": "123456",
             "is_set_top": False,
             "notes": ""
@@ -278,7 +286,7 @@ if __name__ == '__main__':
 
     search_data = {
         "name": "window2",
-        "hwnd": "1234"
+        # "hwnd": "1234"
     }
 
     windows.add_model_row(row_data)

@@ -87,7 +87,7 @@
 
 ### 获取特定当前窗口信息
 
-- URL: `/current_windows/detail?name=<name\>&hwnd=<hwnd\>`
+- URL: `/current_windows/detail?name=<name>&hwnd=<hwnd>`
 - 方法：GET
 - 查询参数
 
@@ -124,7 +124,7 @@
 
 ### 修改特定窗口的笔记
 
-- URL: `/all_windows/detail?name=<name\>&notes=<notes\>`
+- URL: `/all_windows/detail?id=<id>&name=<name>&notes=<notes>`
 - 方法：POST
 - 注意：不要使用 `/current_windows/detail`
 - 查询参数
@@ -162,7 +162,7 @@
 
 ### 置顶或取消置顶特定窗口
 
-- URL: `/current_windows/toggle_set_top?name=<name\>&hwnd=<hwnd\>`
+- URL: `/current_windows/toggle_set_top?name=<name>&hwnd=<hwnd>`
 - 方法：POST
 - 注意：不需要传输`is_set_top`参数
 - 查询参数
