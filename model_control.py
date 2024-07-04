@@ -42,12 +42,9 @@ class ModelControl:
             if current_key_tuple in all_windows_dict:
                 all_row = all_windows_dict[current_key_tuple]
                 if current_row[updated_key] != all_row[updated_key]:
-                    self.current_windows.update_model_row(
-                        updated_key,
-                        all_row[updated_key],
-                        condition_keys[0],  # 使用第一个条件键作为更新条件
-                        current_row[condition_keys[0]]
-                    )
+                    set_dict = {updated_key: all_row[updated_key]}
+                    condition_dict = {key: current_row[key] for key in condition_keys if key in current_row}
+                    self.current_windows.update_model_row(set_dict, condition_dict)
 
 
 # 初始化数据库并创建表

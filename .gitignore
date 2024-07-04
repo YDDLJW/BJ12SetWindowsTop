@@ -21,6 +21,8 @@ venv/
 build/
 dist/
 *.egg-info/
+*.spec
+server_control.spec
 
 # Ignore IDE/editor files
 .vscode/

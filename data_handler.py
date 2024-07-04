@@ -54,9 +54,12 @@ class DataHandler:
             print(f"Condition '{condition}' not found in the provided data.")
             return
 
-        for column, value in data_dict.items():
-            if column != condition:
-                self.model.update_model_row(column, value, condition, condition_value)
+        # 创建更新字典和条件字典
+        set_dict = {column: value for column, value in data_dict.items() if column != condition}
+        condition_dict = {condition: condition_value}
+
+        # 更新模型表
+        self.model.update_model_row(set_dict, condition_dict)
 
     def toggle_is_set_top(self, condition: str, condition_value: str):
         """
@@ -75,8 +78,11 @@ class DataHandler:
         current_value = data.get("is_set_top")
         new_value = 0 if current_value else 1
 
-        self.model.update_model_row("is_set_top", new_value, condition, condition_value)
-        return self.model.get_model({condition: condition_value})
+        set_dict = {"is_set_top": new_value}
+        condition_dict = {condition: condition_value}
+
+        self.model.update_model_row(set_dict, condition_dict)
+        return self.model.get_model(condition_dict)
 
 
 # 测试

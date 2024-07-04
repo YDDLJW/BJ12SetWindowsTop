@@ -48,6 +48,41 @@ class Database:
         cur.close()
         return table
 
+    def get_row(self, table_name: str, query_dict: dict):
+        """
+        根据查询条件获取表中的行。
+        如果只有一行匹配，则返回一个字典；如果有多行匹配，则返回字典列表。
+
+        :param table_name: 表名
+        :param query_dict: 包含查询条件的字典，键为列名，值为查询值
+        :return: 包含匹配行的字典或字典列表
+        """
+        cur = self.conn.cursor()
+        cur.execute(f"PRAGMA table_info({table_name})")
+        columns_info = [col[1] for col in cur.fetchall()]
+
+        # 检查查询条件中的列是否存在于表中
+        for column in query_dict.keys():
+            if column not in columns_info:
+                print(f"Query column '{column}' does not exist in table '{table_name}'")
+                cur.close()
+                return None
+
+        condition_clause = ' AND '.join([f"{col} = ?" for col in query_dict.keys()])
+        query = f"SELECT * FROM {table_name} WHERE {condition_clause}"
+        cur.execute(query, list(query_dict.values()))
+        rows = cur.fetchall()
+
+        if not rows:
+            print(f"No rows found matching the query in table '{table_name}'")
+            cur.close()
+            return None
+
+        result = [{columns_info[i]: row[i] for i in range(len(columns_info))} for row in rows]
+
+        cur.close()
+        return result[0] if len(result) == 1 else result
+
     def add_row(self, table_name, *values):
         """
         向指定表中添加一行数据。ID 列将根据表内现有的最后一个 ID 进行自增。
@@ -77,27 +112,38 @@ class Database:
         self.conn.commit()
         cur.close()
 
-    def update_row(self, table_name, set_column, set_value, condition_column, condition_value):
+    def update_row(self, table_name: str, set_dict: dict, condition_dict: dict):
         """
         更新指定表中符合条件的行。
 
         :param table_name: 表名
-        :param set_column: 需要更新的列名
-        :param set_value: 更新后的值
-        :param condition_column: 条件列名
-        :param condition_value: 条件值
+        :param set_dict: 包含需要更新的字段及其对应值的字典
+        :param condition_dict: 包含作为查询条件的字段及其对应值的字典
         """
         cur = self.conn.cursor()
         cur.execute(f"PRAGMA table_info({table_name})")
         columns_info = [col[1] for col in cur.fetchall()]
 
-        if set_column not in columns_info or condition_column not in columns_info:
-            print(f"One or both columns '{set_column}' or '{condition_column}' do not exist in table '{table_name}'")
+        # 过滤 set_dict 中不存在的列
+        valid_set_dict = {col: val for col, val in set_dict.items() if col in columns_info}
+        if not valid_set_dict:
+            print(f"Database.update_row: No valid set columns exist in table '{table_name}'")
             cur.close()
             return
 
-        query = f"UPDATE {table_name} SET {set_column} = ? WHERE {condition_column} = ?"
-        cur.execute(query, (set_value, condition_value))
+        # 检查 condition_dict 中的列是否存在于表中
+        for column in condition_dict.keys():
+            if column not in columns_info:
+                print(f"Condition column '{column}' does not exist in table '{table_name}'")
+                cur.close()
+                return
+
+        set_clause = ', '.join([f"{col} = ?" for col in valid_set_dict.keys()])
+        condition_clause = ' AND '.join([f"{col} = ?" for col in condition_dict.keys()])
+
+        query = f"UPDATE {table_name} SET {set_clause} WHERE {condition_clause}"
+        values = list(valid_set_dict.values()) + list(condition_dict.values())
+        cur.execute(query, values)
         self.conn.commit()
         cur.close()
 

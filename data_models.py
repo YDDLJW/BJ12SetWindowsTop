@@ -44,7 +44,7 @@ class DataModel:
         table_data = database.get_table(self.model_name)
 
         if not table_data or not table_columns:
-            print(f"No valid data or columns for table '{self.model_name}'")
+            print(f"DataModel.get_model_list: No valid data or columns for table '{self.model_name}'")
             return None
 
         result = [{table_columns[i]: row[i] for i in range(len(table_columns))} for row in table_data]
@@ -62,25 +62,9 @@ class DataModel:
         :return: 包含查询结果的字典或字典列表
         """
         database = Database("db.sqlite3")
-        table_data = database.get_table(self.model_name)
-        table_columns = database.get_columns(self.model_name)
-
-        if not table_data or not table_columns:
-            print(f"No valid data or columns for table '{self.model_name}'")
-            return None
-
-        def row_matches_query(row, query):
-            for col, val in query.items():
-                if col in table_columns and str(row[table_columns.index(col)]) == str(val):
-                    return True
-            return False
-
-        result = []
-        for row in table_data:
-            if row_matches_query(row, query_dict):
-                result.append({table_columns[i]: row[i] for i in range(len(table_columns))})
-
-        return result[0] if len(result) == 1 else result if result else None
+        result = database.get_row(self.model_name, query_dict)
+        database.close_connection()
+        return result
 
     def add_model_row(self, *model_row_data_list):
         """
@@ -111,17 +95,15 @@ class DataModel:
         cur.close()
         database.close_connection()
 
-    def update_model_row(self, set_column, set_value, condition_column, condition_value):
+    def update_model_row(self, set_dict: dict, condition_dict: dict):
         """
         更新模型表中符合条件的行。
 
-        :param set_column: 需要更新的列名
-        :param set_value: 更新后的值
-        :param condition_column: 条件列名
-        :param condition_value: 条件值
+        :param set_dict: 包含需要更新的字段及其对应值的字典
+        :param condition_dict: 包含作为查询条件的字段及其对应值的字典
         """
         database = Database("db.sqlite3")
-        database.update_row(self.model_name, set_column, set_value, condition_column, condition_value)
+        database.update_row(self.model_name, set_dict, condition_dict)
         database.close_connection()
 
     def delete_model_row(self, condition_column, condition_value):
@@ -157,20 +139,22 @@ class CurrentWindows(DataModel):
     def get_model(self, query_dict):
         """
         根据查询条件获取模型表中的一行或多行数据。
-        优先以hwnd查询，如果查询参数有hwnd并且有匹配的项，则仅返回该行。
+        默认hwnd唯一，优先以hwnd查询，如果查询参数有hwnd并且有匹配的项，则仅返回该行。
         否则，调用父类的方法返回匹配项。
 
         :param query_dict: 包含查询条件的字典，键为列名，值为查询值
         :return: 包含查询结果的字典或字典列表
         """
-        if "hwnd" in query_dict:
-            hwnd_value = query_dict["hwnd"]
-            database = Database("db.sqlite3")
-            result = database.get_row_by_column_value(self.model_name, "hwnd", hwnd_value)
-            if result:
-                table_columns = database.get_columns(self.model_name)
-                return {table_columns[i]: result[i] for i in range(len(table_columns))}
-        return super().get_model(query_dict)
+        if "hwnd" not in query_dict:
+            return {"error": "The 'hwnd' field is required."}
+
+        hwnd_value = query_dict["hwnd"]
+        database = Database("db.sqlite3")
+        result = database.get_row_by_column_value(self.model_name, "hwnd", hwnd_value)
+        if result:
+            table_columns = database.get_columns(self.model_name)
+            return {table_columns[i]: result[i] for i in range(len(table_columns))}
+        return {"error": "No matching records found with the specified 'hwnd'."}
 
     def add_model_row(self, *model_row_data_list):
         """
@@ -242,19 +226,17 @@ class AllWindows(DataModel):
                     row["date"] = current_time
         super().add_model_row(*model_row_data_list)
 
-    def update_model_row(self, set_column, set_value, condition_column, condition_value):
+    def update_model_row(self, set_dict, condition_dict):
         """
         更新模型表中符合条件的行。
         在此基础上，将模型中的‘date’字段（上次更新时间）更新成当前时间
 
-        :param set_column: 需要更新的列名
-        :param set_value: 更新后的值
-        :param condition_column: 条件列名
-        :param condition_value: 条件值
+        :param set_dict: 包含需要更新的字段及其对应值的字典
+        :param condition_dict: 包含作为查询条件的字段及其对应值的字典
         """
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-        super().update_model_row('date', current_time, condition_column, condition_value)
-        super().update_model_row(set_column, set_value, condition_column, condition_value)
+        set_dict['date'] = current_time
+        super().update_model_row(set_dict, condition_dict)
 
 
 if __name__ == '__main__':
@@ -286,6 +268,14 @@ if __name__ == '__main__':
         }
     ]
 
+    update_date = {
+        "notes": "update window1 notes"
+    }
+
+    update_condition_data = {
+        "name": "window1",
+    }
+
     search_data = {
         "name": "window2",
         "hwnd": "1234"
@@ -294,7 +284,7 @@ if __name__ == '__main__':
     windows.add_model_row(row_data)
     print(windows.get_model_list())
 
-    windows.update_model_row("notes", "", "name", "window1")
+    windows.update_model_row(update_date, update_condition_data)
     print(windows.get_model_list())
 
     print(windows.get_model(search_data))

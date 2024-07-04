@@ -226,8 +226,8 @@ def backend_self_control(current_windows: CurrentWindows, all_windows: AllWindow
 
     # 需要循环执行的程序都应该在这里执行
     while True:
-        # 该方法内的程序每2s执行一次
-        time.sleep(2)
+        # # 该方法内的程序每2s执行一次
+        # time.sleep(2)
 
         # 实例化模型控制器
         model_control = ModelControl(current_windows, all_windows)
